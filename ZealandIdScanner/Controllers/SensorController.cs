@@ -1,4 +1,4 @@
-﻿    using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using ZealandIdScanner.Models;
 using Microsoft.EntityFrameworkCore;
 using ZealandIdScanner.EBbContext;
@@ -48,48 +48,58 @@ namespace ZealandIdScanner.Controllers
             return _dbContext.Sensors;
         }
 
-        // GET: api/Sensors/2
-        [HttpGet("Id/2")]
-        public ActionResult<Sensors> GetSensor(int id)
+        // GET: api/Sensors/id
+        [HttpGet("Id/{id}")]
+        public async Task<ActionResult<Sensors>> GetSensors(int id)
         {
-            if (_dbContext == null)
+            if (_dbContext.Set<Sensors>() == null)
             {
                 return NotFound("DbContext can't be null");
             }
+            var sensors = await _dbContext.Sensors.FindAsync(id);
 
-            var sensor = _dbContext.Sensors.FindAsync(id);
-
-            if (sensor == null)
+            if (sensors == null)
             {
-                return NotFound("No Such sensor exists");
+                return NotFound("No Such Sensor exists");
             }
-
-            return Ok(sensor);
+            return Ok(sensors);
         }
 
 
         // PUT: api/Sensors/5
         // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPut("{id}")]
-        public async Task<ActionResult<Sensors>> PutSensor(Sensors sensor)
+        public async Task<ActionResult<Sensors>> PutSensor(int id, Sensors updatedSensor)
         {
-            if (sensor == null)
+            if (updatedSensor == null || id != updatedSensor.SensorId)
             {
-                return BadRequest("Invalid data");
+                return BadRequest("Invalid data or mismatched IDs");
             }
 
             try
             {
-                _dbContext.Sensors.Add(sensor);
+                // Check if the sensor with the given ID exists
+                var existingSensor = await _dbContext.Sensors.FindAsync(id);
+
+                if (existingSensor == null)
+                {
+                    return NotFound("Sensor not found");
+                }
+
+                // Update the existing sensor properties
+                existingSensor.Navn = updatedSensor.Navn;
+
+                // Save changes to the database
                 await _dbContext.SaveChangesAsync();
 
-                return CreatedAtAction("GetSensor", new { id = sensor.SensorId }, sensor);
+                return Ok(existingSensor);
             }
             catch (Exception ex)
             {
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
+
 
 
         // POST: api/Sensors
@@ -111,7 +121,7 @@ namespace ZealandIdScanner.Controllers
 
             // Assuming you have configured DbContextOptions in your application's startup
             var optionsBuilder = new DbContextOptionsBuilder<ZealandIdContext>();
-            optionsBuilder.UseSqlServer("Data Source=mssql11.unoeuro.com;Initial Catalog=zealandid_dk_db_test;User ID=zealandid_dk;Password=********;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False"); // Replace with your actual connection string
+            optionsBuilder.UseSqlServer("Data Source=mssql11.unoeuro.com;Initial Catalog=zealandid_dk_db_test;User ID=zealandid_dk;Password=4tn2gwfADdeRB5EGzm6b;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False"); // Replace with your actual connection string
 
             using (var ctx = new ZealandIdContext(optionsBuilder.Options))
             {
@@ -127,28 +137,35 @@ namespace ZealandIdScanner.Controllers
             return Ok();
         }
 
-
-
-
-        // DELETE: api/Sensors/5
         [HttpDelete("{id}")]
         public async Task<IActionResult> DeleteSensor(int id)
         {
-            if (_dbContext.Sensors == null)
+            try
             {
-                return NotFound();
+                var sensor = await _dbContext.Sensors.FindAsync(id);
+                if (sensor == null)
+                {
+                    return NotFound();
+                }
+
+                // Find and delete associated Lokaler records
+                var lokalerRecords = _dbContext.Lokaler.Where(l => l.SensorId == id).ToList();
+                _dbContext.Lokaler.RemoveRange(lokalerRecords);
+
+                // Delete the sensor
+                _dbContext.Sensors.Remove(sensor);
+                await _dbContext.SaveChangesAsync();
+
+                return NoContent();
             }
-            var sensor = await _dbContext.Sensors.FindAsync(id);
-            if (sensor == null)
+            catch (Exception ex)
             {
-                return NotFound();
+                // Log the exception details
+                return StatusCode(500, $"Internal server error: {ex.Message}");
             }
-
-            _dbContext.Sensors.Remove(sensor);
-            await _dbContext.SaveChangesAsync();
-
-            return NoContent();
         }
+
+
 
         private bool SensorExists(int id)
         {

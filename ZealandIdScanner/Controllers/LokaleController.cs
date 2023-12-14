@@ -47,7 +47,7 @@ namespace ZealandIdScanner.Controllers
         }
 
         [HttpPost]
-        public ActionResult PostNewLokale(Lokaler lokaler)
+        public ActionResult PostNewLokaler(Lokaler lokaler)
         {
             if (lokaler == null)
             {
@@ -63,7 +63,7 @@ namespace ZealandIdScanner.Controllers
 
             // Assuming you have configured DbContextOptions in your application's startup
             var optionsBuilder = new DbContextOptionsBuilder<ZealandIdContext>();
-            optionsBuilder.UseSqlServer("your_connection_string_here"); // Replace with your actual connection string
+            optionsBuilder.UseSqlServer("Data Source=mssql11.unoeuro.com;Initial Catalog=zealandid_dk_db_test;User ID=zealandid_dk;Password=4tn2gwfADdeRB5EGzm6b;Connect Timeout=30;Encrypt=False;Trust Server Certificate=False;Application Intent=ReadWrite;Multi Subnet Failover=False"); // Replace with your actual connection string
 
             using (var ctx = new ZealandIdContext(optionsBuilder.Options))
             {
@@ -71,80 +71,74 @@ namespace ZealandIdScanner.Controllers
                 {
                     LokaleId = lokaler.LokaleId,
                     Navn = lokaler.Navn,
+                    SensorId = lokaler.SensorId
                 });
 
-                ctx.SaveChanges();
+                ctx.SaveChangesAsync();
             }
 
             return Ok();
         }
-        //public async Task<ActionResult<Lokaler>> PostLokale(Lokaler lokale)
-        //{
-        //    if (lokale == null)
-        //    {
-        //        return BadRequest("Invalid data");
-        //    }
 
-        //    try
-        //    {
-        //        _dbContext.Lokaler.Add(lokale);
-        //        await _dbContext.SaveChangesAsync();
+        [HttpPut("{id}")]
+        public async Task<ActionResult<Lokaler>> PutLokaler(int id, Lokaler updatedLokaler)
+        {
+            if (updatedLokaler == null || id != updatedLokaler.LokaleId)
+            {
+                return BadRequest("Invalid data or mismatched IDs");
+            }
 
-        //        // Change the following line
-        //        return CreatedAtAction("GetLokale", new { id = lokale.LokaleId }, lokale);
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Console.WriteLine(ex.ToString());
+            try
+            {
+                // Check if the Lokaler with the given ID exists
+                var existingLokaler = await _dbContext.Lokaler.FindAsync(id);
 
-        //        // Return a detailed error response
-        //        return StatusCode(500, $"Internal server error: {ex.Message}");
-        //    }
-        //}
+                if (existingLokaler == null)
+                {
+                    return NotFound("Lokaler not found");
+                }
 
+                // Update the existing Lokaler properties
+                existingLokaler.Navn = updatedLokaler.Navn;
 
+                // Save changes to the database
+                await _dbContext.SaveChangesAsync();
 
-        //// GET: LokaleController/Edit/5
-        //public ActionResult Edit(int id)
-        //{
-        //    return View();
-        //}
+                return Ok(existingLokaler);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
 
-        //// POST: LokaleController/Edit/5
-        //[HttpPost]
-        //[ValidateAntiForgeryToken]
-        //public ActionResult Edit(int id, IFormCollection collection)
-        //{
-        //    try
-        //    {
-        //        return RedirectToAction(nameof(Index));
-        //    }
-        //    catch
-        //    {
-        //        return View();
-        //    }
-        //}
+        [HttpDelete("{id}")]
+        public async Task<IActionResult> DeleteLokale(int id)
+        {
+            try
+            {
+                var lokaler = await _dbContext.Lokaler.FindAsync(id);
+                if (lokaler == null)
+                {
+                    return NotFound();
+                }
 
-        //// GET: LokaleController/Delete/5
-        //public ActionResult Delete(int id)
-        //{
-        //    return View();
-        //}
+                // Find and delete associated Lokaler records
+                var lokalerRecords = _dbContext.Lokaler.Where(l => l.LokaleId == id).ToList();
+                _dbContext.Lokaler.RemoveRange(lokalerRecords);
 
-        //// POST: LokaleController/Delete/5
-        //[HttpPost]
-        //[ValidateAntiForgeryToken]
-        //public ActionResult Delete(int id, IFormCollection collection)
-        //{
-        //    try
-        //    {
-        //        return RedirectToAction(nameof(Index));
-        //    }
-        //    catch
-        //    {
-        //        return View();
-        //    }
-        //}
+                // Delete the sensor
+                _dbContext.Lokaler.Remove(lokaler);
+                await _dbContext.SaveChangesAsync();
+
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                // Log the exception details
+                return StatusCode(500, $"Internal server error: {ex.Message}");
+            }
+        }
     }
 }
 
