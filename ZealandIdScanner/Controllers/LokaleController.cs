@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore;
 using ZealandIdScanner.EBbContext;
 
 namespace ZealandIdScanner.Controllers
-    //hej
+    
 {
     [ApiController]
     [Route("api/[controller]")]
